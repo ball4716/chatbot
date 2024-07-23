@@ -1,6 +1,6 @@
 import sys
 import logging
-from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QVBoxLayout, QWidget, QSystemTrayIcon, QLabel, QScrollArea, QHBoxLayout, QFrame, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QVBoxLayout, QWidget, QSystemTrayIcon, QLabel, QScrollArea, QHBoxLayout, QFrame, QMessageBox, QPushButton
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, Qt, QPropertyAnimation, QPoint
 from PyQt5.QtGui import QIcon
@@ -54,6 +54,19 @@ class MainWindow(QMainWindow):
         self.slide_button.mousePressEvent = self.toggle_window
         self.slide_button.setWindowFlags(Qt.WindowStaysOnTopHint)
         self.slide_button.show()
+
+        # 닫힘 버튼 설정
+        self.close_button = QPushButton('X', self)
+        self.close_button.setGeometry(self.width() - 40, 10, 30, 30)
+        self.close_button.setStyleSheet("""
+            background-color: rgba(255, 0, 0, 0.5);
+            color: white;
+            border-radius: 15px;
+            font-weight: bold;
+        """)
+        self.close_button.clicked.connect(self.close_application)
+        self.close_button.setWindowFlags(Qt.WindowStaysOnTopHint)
+        self.close_button.show()
 
         self.is_hidden = False
 
@@ -140,65 +153,12 @@ class MainWindow(QMainWindow):
         # Update system parameters
         ctypes.windll.user32.SystemParametersInfoW(0x002F, 0, ctypes.byref(work_area), 0)
 
-class SystemTrayApp(QSystemTrayIcon):
-    def __init__(self, app, window):
-        super().__init__(QIcon('app/static/favicon.ico'), app)  # 경로 수정
-        self.window = window
-
-        self.setToolTip('Chatbot')
-        menu = QMenu()
-        show_action = QAction("Show/Hide", self)
-        show_action.triggered.connect(self.toggle_window)
-        menu.addAction(show_action)
-
-        exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.exit_app)
-        menu.addAction(exit_action)
-
-        self.setContextMenu(menu)
-        self.activated.connect(self.on_tray_icon_activated)
-
-    def toggle_window(self):
-        logging.debug('Toggling window visibility')
-        self.window.toggle_window()
-
-    def exit_app(self):
-        logging.debug('Exiting application')
-        QApplication.instance().quit()
-
-    def on_tray_icon_activated(self, reason):
-        if reason == QSystemTrayIcon.Trigger:
-            logging.debug('Tray icon clicked')
-            self.toggle_window()
-
-class App(QApplication):
-    def __init__(self, sys_argv):
-        super().__init__(sys_argv)
-        self.main_window = MainWindow()
-        self.tray_icon = SystemTrayApp(self, self.main_window)
-        self.tray_icon.show()
-        self.setQuitOnLastWindowClosed(False)
-
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
-
-def run_as_admin():
-    if not is_admin():
-        try:
-            ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1
-            )
-            sys.exit(0)
-        except Exception as e:
-            QMessageBox.critical(None, "Admin Privileges Required", f"Failed to obtain admin privileges: {e}")
-            sys.exit(1)
+    def close_application(self):
+        self.adjust_workspace(True)
+        self.close()  # Properly close the main window
+        QApplication.instance().quit()  # Exit the application
 
 if __name__ == '__main__':
-    run_as_admin()
-
     def run_flask():
         app = create_app()
         # Flask 설정 최적화
@@ -212,16 +172,36 @@ if __name__ == '__main__':
 
         app.run(debug=False, use_reloader=False, threaded=False)  # debug 모드를 제거하여 성능 최적화
 
+    def is_admin():
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    def run_as_admin():
+        if not is_admin():
+            try:
+                ctypes.windll.shell32.ShellExecuteW(
+                    None, "runas", sys.executable, " ".join(sys.argv), None, 1
+                )
+                sys.exit(0)
+            except Exception as e:
+                QMessageBox.critical(None, "Admin Privileges Required", f"Failed to obtain admin privileges: {e}")
+                sys.exit(1)
+
+    run_as_admin()
+
     try:
         logging.debug('Starting server thread')
         server_thread = Thread(target=run_flask)
         server_thread.start()
 
         logging.debug('Starting Qt application')
-        app = App(sys.argv)
-        app.main_window.show_with_animation()  # 애플리케이션 실행 시 메인 윈도우를 표시
+        app = QApplication(sys.argv)
+        main_window = MainWindow()
+        main_window.show_with_animation()  # 애플리케이션 실행 시 메인 윈도우를 표시
 
-        app.main_window.toggle_window()
+        main_window.toggle_window()
 
         sys.exit(app.exec_())
     except Exception as e:

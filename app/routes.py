@@ -21,6 +21,10 @@ def upload():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
     if file:
-        file_path = os.path.join(os.getcwd(), 'uploads', file.filename)
+        filename = file.filename
+        file_path = os.path.join(os.getcwd(), 'uploads', filename)
         file.save(file_path)
-        return jsonify({'success': 'File uploaded successfully'}), 200
+        return jsonify({'success': 'File uploaded successfully', 'filename': filename}), 200
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'pdf', 'xlsx', 'docx'}
