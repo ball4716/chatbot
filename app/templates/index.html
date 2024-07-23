@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>Chatbot</title>
+</head>
+<body>
+    <div class="chat-container">
+        <div id="messages" class="chat-messages"></div>
+        <div class="chat-input-container">
+            <textarea id="message-input" placeholder="Type a message..."></textarea>
+            <button id="send-button">Send</button>
+        </div>
+        <div class="upload-container">
+            <label for="file-upload" class="custom-file-upload">
+                Drag and drop a PDF file here or click to upload
+            </label>
+            <input id="file-upload" type="file" accept=".pdf"/>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+</body>
+</html>
