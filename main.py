@@ -1,6 +1,6 @@
 import sys
 import logging
-from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QVBoxLayout, QWidget, QSystemTrayIcon, QLabel, QScrollArea, QHBoxLayout, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QVBoxLayout, QWidget, QSystemTrayIcon, QLabel, QScrollArea, QHBoxLayout, QFrame, QMessageBox
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, Qt, QPropertyAnimation, QPoint
 from PyQt5.QtGui import QIcon
@@ -109,29 +109,35 @@ class MainWindow(QMainWindow):
         self.is_hidden = not self.is_hidden
 
     def adjust_workspace(self, restore):
-        # Adjust the workspace so other windows are moved aside
-        SM_XVIRTUALSCREEN = 76
-        SM_YVIRTUALSCREEN = 77
+        import ctypes
+        import ctypes.wintypes
+
+        # Define constants
         SM_CXVIRTUALSCREEN = 78
         SM_CYVIRTUALSCREEN = 79
+        SM_CYSCREEN = 1
 
-        x = ctypes.windll.user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
-        y = ctypes.windll.user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
+        # Get screen dimensions
         cx = ctypes.windll.user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
-        cy = ctypes.windll.user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
+        cy = ctypes.windll.user32.GetSystemMetrics(SM_CYSCREEN)
 
+        # Get the work area excluding the taskbar
         work_area = ctypes.wintypes.RECT()
-        if restore:
-            work_area.left = x
-            work_area.top = y
-            work_area.right = x + cx
-            work_area.bottom = y + cy
-        else:
-            work_area.left = x
-            work_area.top = y
-            work_area.right = x + cx - 800
-            work_area.bottom = y + cy
+        ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(work_area), 0)
+        taskbar_height = cy - work_area.bottom
 
+        if restore:
+            work_area.left = 0
+            work_area.top = 0
+            work_area.right = cx
+            work_area.bottom = cy - taskbar_height
+        else:
+            work_area.left = 0
+            work_area.top = 0
+            work_area.right = cx - 800
+            work_area.bottom = cy - taskbar_height
+
+        # Update system parameters
         ctypes.windll.user32.SystemParametersInfoW(0x002F, 0, ctypes.byref(work_area), 0)
 
 class SystemTrayApp(QSystemTrayIcon):
@@ -173,7 +179,26 @@ class App(QApplication):
         self.tray_icon.show()
         self.setQuitOnLastWindowClosed(False)
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+def run_as_admin():
+    if not is_admin():
+        try:
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1
+            )
+            sys.exit(0)
+        except Exception as e:
+            QMessageBox.critical(None, "Admin Privileges Required", f"Failed to obtain admin privileges: {e}")
+            sys.exit(1)
+
 if __name__ == '__main__':
+    run_as_admin()
+
     def run_flask():
         app = create_app()
         # Flask 설정 최적화
